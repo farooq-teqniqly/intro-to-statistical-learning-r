@@ -1,0 +1,137 @@
+---
+title: "Introduction to Statistical Learning 2e - Chapter 03 - Linear Regression"
+author: "Farooq Mahmud"
+format: 
+  html:
+    self-contained: true
+    echo: true
+    message: false
+    warning: false
+    error: true # IMPORTANT NOTE - this makes the file render even if there is an error. it is imperative that you check your .html document *before submission* to make sure that it has all results in it.
+editor: source
+---
+
+**Preamble**
+```{r}
+library(ISLR2)
+library(tidyverse)
+library(viridis)
+library(glmtoolbox)
+
+rounded <- function(n, digits = 2) {
+  return(round(n, digits))
+}
+
+boston <- ISLR2::Boston
+```
+
+## Simple Linear Regression
+
+**Fit a simple linear regression model, with `medv` as the response and `lstat` as the predictor.**
+```{r}
+model <- glm(medv ~ lstat, data = boston, family = "gaussian")
+summary(model)
+```
+
+**Plot `medv` and `lstat` along with the regression line.**
+```{r}
+boston |>
+  ggplot(aes(x = lstat, y = medv)) +
+  geom_point() +
+  geom_abline(intercept = model$coefficients[1], slope = model$coefficients[2], color = "#D64550", linewidth = 1.2) +
+  labs(
+    title = "Median housing value as a function of low socio-economic status",
+    x = "Low socio-economic status (%)",
+    y = "Median home value (thousands of $)"
+  ) +
+  scale_color_viridis_c(option = "C", direction = -1) +
+  theme_minimal()
+```
+
+## Multiple Linear Regression
+
+**Fit a multiple linear regression model, with `medv` as the response and `lstat` and `age` as the predictors.
+```{r}
+model2 <- glm(medv ~ lstat + age, data = boston, family = "gaussian")
+summary(model2)
+```
+
+**Fit a multiple linear regression model, with `medv` as the response and the remaining variables as the predictors.
+```{r}
+model3 <- glm(medv ~ ., data = boston, family = "gaussian")
+summary(model3)
+```
+
+**Is this a significant regression line at $\alpha=0.05$?**
+```{r}
+model3_reduced <- glm(medv ~ 1, data = boston, family = "gaussian")
+anova(model3_reduced, model3)
+```
+$H_0$: All slopes are zero.
+$H_1$: At least one slope is non-zero.
+
+Since $p<\alpha$, there is sufficient evidence to suggest at least one slope is non-zero. Therefore, $H_0$ is rejected.
+
+**In the preceeding model, `indus` and `car` have high $p$-values. Exclude these from the model.
+```{r}
+model4 <- glm(medv ~ . - age - indus, data = boston, family = "gaussian")
+summary(model4)
+```
+
+**Compute the predicted values using the prededing models. Add the predictions to the `boston` dataset.**
+```{r}
+boston <- boston |>
+  mutate(medv_predicted_m1 = predict(model)) |>
+  mutate(medv_predicted_m2 = predict(model2)) |>
+  mutate(medv_predicted_m3 = predict(model3)) |>
+  mutate(medv_predicted_m4 = predict(model4)) |>
+  relocate(medv, .before = crim) |>
+  relocate(medv_predicted_m1, .after = medv) |>
+  relocate(medv_predicted_m2, .after = medv_predicted_m1) |>
+  relocate(medv_predicted_m3, .after = medv_predicted_m2) |>
+  relocate(medv_predicted_m4, .after = medv_predicted_m3)
+
+boston |>
+  select(1:5) |>
+  head(3)
+```
+
+**Compare the adjusted $R^2$ values for each model. What conclusions can be made?**
+```{r}
+models <- list(model, model2, model3, model4)
+model_names <- c("m1", "m2", "m3", "m4")
+
+r_squared_df <- data.frame(
+  model = model_names,
+  adj_r2 = sapply(models, adjR2)
+)
+
+r_squared_df
+```
+Model #3 and #4 have better fits than Models #1 and #2. Model #4 has a better fit than Model #3 with two fewer variables.
+
+**Is multicoliearality a problem with the preceding model?**
+```{r}
+library(car)
+car::vif(model4)
+```
+Most VIF values are below five, which suggests multicoliearality is not a problem. There appears to me some correlation between `rad` and `tax` and this can be verified using `cor()`:
+```{r}
+cor(boston$rad, boston$tax)
+```
+Let's remove `tax` from the model since it has a higher $p$-value than `rad`:
+```{r}
+boston_orig <- ISLR2::Boston
+model5 <- glm(medv ~ . - age - indus - tax, data = boston_orig, family = "gaussian")
+summary(model5)
+adjR2(model5)
+car::vif(model5)
+```
+The adjusted $R^2$ still indicates a decent fit with one less variable. The `vif()` output shows that multicoliearality is not a problem.
+
+**Assess the assumptions on the linear model.**
+```{r}
+library(classpackage)
+anova_check(model5)
+```
+The Q-Q plot of the residulas don't follow the diagonal line very well, indiciating the residuals do not follow a normal distribution. There is evidence for a non-linear fit.
