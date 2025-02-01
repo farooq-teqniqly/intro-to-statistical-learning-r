@@ -4,7 +4,7 @@
     "Repositories": [
       {
         "Name": "CRAN",
-        "URL": "https://ftp.osuosl.org/pub/cran"
+        "URL": "https://cloud.r-project.org"
       }
     ]
   },
@@ -464,7 +464,7 @@
         "purrr",
         "tidyr"
       ],
-      "Hash": "c8b95e1efb87be90a6d88997c4485635"
+      "Hash": "6fd428507428f1a7debb089ca5f5dfeb"
     },
     "cli": {
       "Package": "cli",
